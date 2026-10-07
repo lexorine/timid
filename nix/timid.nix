@@ -3,16 +3,15 @@
   pkgs,
   nixpak,
   browser,
-  policies ? { },
-  recommendedPolicies ? { },
-  policyDirs ? [ ],
+  policies ? {},
+  recommendedPolicies ? {},
+  policyDirs ? [],
   binPath ? null,
   debug ? false,
   withProc ? true,
   ephemeral ? false,
-  chromeFlags ? [ "--password-store=basic" "--enable-features=BraveAIChatAgentProfile" ],
-}:
-let
+  chromeFlags ? ["--password-store=basic" "--enable-features=BraveAIChatAgentProfile"],
+}: let
   browserName = lib.getName browser;
   lowerName = lib.toLower browserName;
 
@@ -21,81 +20,102 @@ let
   isChrome = lib.hasInfix "chrome" lowerName && !isChromium;
 
   appBinPath =
-    if binPath != null then
-      (if lib.hasPrefix "bin/" binPath then binPath else "bin/${binPath}")
-    else
-      "bin/${browser.meta.mainProgram or browserName}";
+    if binPath != null
+    then
+      (
+        if lib.hasPrefix "bin/" binPath
+        then binPath
+        else "bin/${binPath}"
+      )
+    else "bin/${browser.meta.mainProgram or browserName}";
 
   mainProgram =
-    if binPath != null then
-      lib.removePrefix "bin/" appBinPath
-    else
-      (browser.meta.mainProgram or browserName);
+    if binPath != null
+    then lib.removePrefix "bin/" appBinPath
+    else (browser.meta.mainProgram or browserName);
 
   flatpakAppId =
-    if isBrave then "com.brave.Browser"
-    else if isChromium then "org.chromium.Chromium"
-    else if isChrome then "com.google.Chrome"
-    else "app.${builtins.replaceStrings [ " " "." "/" ] [ "-" "-" "-" ] browserName}";
+    if isBrave
+    then "com.brave.Browser"
+    else if isChromium
+    then "org.chromium.Chromium"
+    else if isChrome
+    then "com.google.Chrome"
+    else "app.${builtins.replaceStrings [" " "." "/"] ["-" "-" "-"] browserName}";
 
   profileBackingDir = "/.local/state/nixpak/${lowerName}";
 
   profileDir =
-    if isBrave then
-      (if lib.hasInfix "nightly" lowerName then "/.config/BraveSoftware/Brave-Browser-Nightly"
-       else if lib.hasInfix "beta" lowerName then "/.config/BraveSoftware/Brave-Browser-Beta"
-       else "/.config/BraveSoftware/Brave-Browser")
-    else if isChromium then "/.config/chromium"
-    else if isChrome then "/.config/google-chrome"
+    if isBrave
+    then
+      (
+        if lib.hasInfix "nightly" lowerName
+        then "/.config/BraveSoftware/Brave-Browser-Nightly"
+        else if lib.hasInfix "beta" lowerName
+        then "/.config/BraveSoftware/Brave-Browser-Beta"
+        else "/.config/BraveSoftware/Brave-Browser"
+      )
+    else if isChromium
+    then "/.config/chromium"
+    else if isChrome
+    then "/.config/google-chrome"
     else "/.config/${browserName}";
 
   browserCacheDir =
-    if isBrave then "BraveSoftware"
-    else if isChromium then "chromium"
-    else if isChrome then "google-chrome"
+    if isBrave
+    then "BraveSoftware"
+    else if isChromium
+    then "chromium"
+    else if isChrome
+    then "google-chrome"
     else browserName;
 
   mprisName =
-    if isBrave then "brave"
-    else if isChromium then "chromium"
-    else if isChrome then "chrome"
+    if isBrave
+    then "brave"
+    else if isChromium
+    then "chromium"
+    else if isChrome
+    then "chrome"
     else lowerName;
 
-  customPolicyDirs = [
-    "/etc/brave/policies"
-    "/etc/brave-browser/policies"
-    "/etc/brave-browser-nightly/policies"
-    "/etc/chromium/policies"
-    "/etc/opt/chrome/policies"
-    "/etc/${lowerName}/policies"
-    "/etc/${browserName}/policies"
-  ] ++ policyDirs;
+  customPolicyDirs =
+    [
+      "/etc/brave/policies"
+      "/etc/brave-browser/policies"
+      "/etc/brave-browser-nightly/policies"
+      "/etc/chromium/policies"
+      "/etc/opt/chrome/policies"
+      "/etc/${lowerName}/policies"
+      "/etc/${browserName}/policies"
+    ]
+    ++ policyDirs;
 
   allPolicyDirs = lib.unique customPolicyDirs;
 
-  hasPolicies = policies != { };
+  hasPolicies = policies != {};
   policyFile = pkgs.writeText "${lowerName}-policies.json" (builtins.toJSON policies);
 
-  policyBinds = lib.optionals hasPolicies (map (dir: [ "${policyFile}" "${dir}/managed/policies.json" ]) allPolicyDirs);
+  policyBinds = lib.optionals hasPolicies (map (dir: ["${policyFile}" "${dir}/managed/policies.json"]) allPolicyDirs);
 
-  hasRecommendedPolicies = recommendedPolicies != { };
+  hasRecommendedPolicies = recommendedPolicies != {};
   recommendedPolicyFile = pkgs.writeText "${lowerName}-recommended-policies.json" (builtins.toJSON recommendedPolicies);
 
-  recommendedPolicyBinds = lib.optionals hasRecommendedPolicies (map (dir: [ "${recommendedPolicyFile}" "${dir}/recommended/policies.json" ]) allPolicyDirs);
+  recommendedPolicyBinds = lib.optionals hasRecommendedPolicies (map (dir: ["${recommendedPolicyFile}" "${dir}/recommended/policies.json"]) allPolicyDirs);
 
   browserWithClipboard = pkgs.symlinkJoin {
     name = "${lowerName}-with-extras";
-    paths = [ browser pkgs.wl-clipboard ];
+    paths = [browser pkgs.wl-clipboard];
   };
 
   browserWithFlags =
-    if chromeFlags == [ ] then
-      browserWithClipboard
+    if chromeFlags == []
+    then browserWithClipboard
     else
       pkgs.symlinkJoin {
         name = "${lowerName}-with-flags";
-        paths = [ browserWithClipboard ];
-        nativeBuildInputs = [ pkgs.makeWrapper ];
+        paths = [browserWithClipboard];
+        nativeBuildInputs = [pkgs.makeWrapper];
         postBuild = ''
           if [ -e "$out/bin/${mainProgram}" ]; then
             rm -f "$out/bin/${mainProgram}"
@@ -108,14 +128,17 @@ let
 
   debugPackage = pkgs.symlinkJoin {
     name = "${lowerName}-debug-shell";
-    paths = [ pkgs.fish browserWithFlags ];
+    paths = [pkgs.fish browserWithFlags];
   };
 
-  mkNixPak = nixpak.lib.nixpak { inherit lib pkgs; };
+  mkNixPak = nixpak.lib.nixpak {inherit lib pkgs;};
 in
-mkNixPak {
-  config = { config, sloth, ... }:
-    let
+  mkNixPak {
+    config = {
+      config,
+      sloth,
+      ...
+    }: let
       envSuffix = key: suf: sloth.concat' (sloth.env key) suf;
       envOrSuffix = key: fallback: suf: sloth.concat' (sloth.envOr key fallback) suf;
 
@@ -125,8 +148,14 @@ mkNixPak {
 
       cacheMount = envOrSuffix "HOME" "" "/.var/app/${config.flatpak.appId}/cache";
     in {
-      app.package = if debug then debugPackage else browserWithFlags;
-      app.binPath = if debug then "bin/fish" else appBinPath;
+      app.package =
+        if debug
+        then debugPackage
+        else browserWithFlags;
+      app.binPath =
+        if debug
+        then "bin/fish"
+        else appBinPath;
 
       flatpak.appId = flatpakAppId;
 
@@ -179,7 +208,7 @@ mkNixPak {
         };
 
         tmpfs =
-          [ "/tmp" ]
+          ["/tmp"]
           ++ lib.optionals ephemeral [
             (sloth.concat' home profileDir)
             (sloth.concat' home profileBackingDir)
@@ -257,7 +286,7 @@ mkNixPak {
             "/run/current-system/sw/share/libdrm"
           ];
 
-        bind.dev = [ "/dev/dri" ];
+        bind.dev = ["/dev/dri"];
 
         env = {
           DISPLAY = sloth.envOr "DISPLAY" ":0";
@@ -277,4 +306,4 @@ mkNixPak {
         };
       };
     };
-}
+  }
