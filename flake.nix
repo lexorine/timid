@@ -19,10 +19,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    debloat-profile = {
-      url = "https://raw.githubusercontent.com/yashgorana/chrome-debloat/refs/heads/main/generated/linux/brave.json";
-      flake = false;
-    };
+    # NOTE: there is deliberately no `debloat-profile` flake input anymore.
+    # Upstream (NVFP4/chrome-debloat, ex-yashgorana/chrome-debloat) was
+    # rewritten as a Rust TUI and stopped publishing pre-generated JSON, so it
+    # can no longer be consumed as a pinned flake input. modules/brave.json is
+    # now vendored and regenerated from upstream's src/manifest.yaml by
+    # scripts/gen-debloat-policy.py, which .github/workflows/autoupdate.yml
+    # runs daily.
   };
 
   outputs = inputs: let
@@ -32,8 +35,9 @@
       "aarch64-linux"
     ];
   in {
-    formatter = eachSystem (system:
-      inputs.nixpkgs.legacyPackages.${system}.alejandra
+    formatter = eachSystem (
+      system:
+        inputs.nixpkgs.legacyPackages.${system}.alejandra
     );
 
     lib = eachSystem (system: {
@@ -41,87 +45,88 @@
         pkgs ? inputs.nixpkgs.legacyPackages.${system},
         browser,
         name,
-        basePolicies ? import ./modules/policies-small.nix { },
-        policyDirs ? [ ],
+        basePolicies ? import ./modules/policies-small.nix {},
+        policyDirs ? [],
         ephemeralPolicies ? {
           HomepageLocation = "about:blank";
           HomepageIsNewTabPage = false;
           ShowHomeButton = true;
           RestoreOnStartup = 4;
-          RestoreOnStartupURLs = [ "about:blank" ];
+          RestoreOnStartupURLs = ["about:blank"];
           NewTabPageLocation = "about:blank";
         },
-      }:
-        let
-          browserBin = browser.meta.mainProgram or (lib.getName browser);
-          nixpak = inputs.nixpak;
+      }: let
+        browserBin = browser.meta.mainProgram or (lib.getName browser);
+        nixpak = inputs.nixpak;
 
-          mkTimid = args:
-            import ./nix/timid.nix ({
+        mkTimid = args:
+          import ./nix/timid.nix ({
               inherit lib pkgs nixpak browser;
-            } // args);
-
-          drv = mkTimid {
-            withProc = true;
-            policies = basePolicies.managed or basePolicies;
-            recommendedPolicies = basePolicies.recommended or { };
-            inherit policyDirs;
-            chromeFlags = [ "--password-store=basic" ];
-          };
-
-          drvNoProc = mkTimid {
-            withProc = false;
-            policies = basePolicies.managed or basePolicies;
-            recommendedPolicies = basePolicies.recommended or { };
-            inherit policyDirs;
-            chromeFlags = [ "--password-store=basic" ];
-          };
-
-          drvEphemeral = mkTimid {
-            withProc = true;
-            ephemeral = true;
-            policies = (basePolicies.managed or basePolicies) // ephemeralPolicies;
-            recommendedPolicies = basePolicies.recommended or { };
-            inherit policyDirs;
-            chromeFlags = [ "--password-store=basic" ];
-          };
-
-          baseEnv = drv.config.env;
-          noProcEnv = drvNoProc.config.env;
-          ephemeralBaseEnv = drvEphemeral.config.env;
-
-          ephemeralLauncher = pkgs.writeShellScriptBin "${name}-ephemeral" ''
-            set -euo pipefail
-            runtime_root="''${XDG_RUNTIME_DIR:-/tmp}/${name}-ephemeral"
-            mkdir -p "$runtime_root"
-
-            instance_dir="$(mktemp -d "$runtime_root/instance-XXXXXX")"
-            profile_dir="$instance_dir/profile"
-            cache_dir="$instance_dir/cache"
-
-            mkdir -p "$profile_dir" "$cache_dir"
-
-            cleanup() {
-              rm -rf "$instance_dir"
             }
-            trap cleanup EXIT INT TERM
+            // args);
 
-            exec "${ephemeralBaseEnv}/bin/${browserBin}" \
-              --user-data-dir="$profile_dir" \
-              --disk-cache-dir="$cache_dir" \
-              --no-first-run \
-              --no-default-browser-check \
-              "$@"
-          '';
+        drv = mkTimid {
+          withProc = true;
+          policies = basePolicies.managed or basePolicies;
+          recommendedPolicies = basePolicies.recommended or {};
+          inherit policyDirs;
+          chromeFlags = ["--password-store=basic"];
+        };
 
-          ephemeralEnv = pkgs.symlinkJoin {
-            name = "${name}-ephemeral";
-            paths = [ ephemeralBaseEnv ephemeralLauncher ];
-          };
+        drvNoProc = mkTimid {
+          withProc = false;
+          policies = basePolicies.managed or basePolicies;
+          recommendedPolicies = basePolicies.recommended or {};
+          inherit policyDirs;
+          chromeFlags = ["--password-store=basic"];
+        };
 
-          renameBin = env: suffix: pkgs.symlinkJoin {
+        drvEphemeral = mkTimid {
+          withProc = true;
+          ephemeral = true;
+          policies = (basePolicies.managed or basePolicies) // ephemeralPolicies;
+          recommendedPolicies = basePolicies.recommended or {};
+          inherit policyDirs;
+          chromeFlags = ["--password-store=basic"];
+        };
+
+        baseEnv = drv.config.env;
+        noProcEnv = drvNoProc.config.env;
+        ephemeralBaseEnv = drvEphemeral.config.env;
+
+        ephemeralLauncher = pkgs.writeShellScriptBin "${name}-ephemeral" ''
+          set -euo pipefail
+          runtime_root="''${XDG_RUNTIME_DIR:-/tmp}/${name}-ephemeral"
+          mkdir -p "$runtime_root"
+
+          instance_dir="$(mktemp -d "$runtime_root/instance-XXXXXX")"
+          profile_dir="$instance_dir/profile"
+          cache_dir="$instance_dir/cache"
+
+          mkdir -p "$profile_dir" "$cache_dir"
+
+          cleanup() {
+            rm -rf "$instance_dir"
+          }
+          trap cleanup EXIT INT TERM
+
+          exec "${ephemeralBaseEnv}/bin/${browserBin}" \
+            --user-data-dir="$profile_dir" \
+            --disk-cache-dir="$cache_dir" \
+            --no-first-run \
+            --no-default-browser-check \
+            "$@"
+        '';
+
+        ephemeralEnv = pkgs.symlinkJoin {
+          name = "${name}-ephemeral";
+          paths = [ephemeralBaseEnv ephemeralLauncher];
+        };
+
+        renameBin = env: suffix:
+          pkgs.symlinkJoin {
             name = "${name}${suffix}";
-            paths = [ env ];
+            paths = [env];
             postBuild = ''
               mkdir -p $out/bin
               if [ -e "${env}/bin/${browserBin}" ]; then
@@ -129,11 +134,11 @@
               fi
             '';
           };
-        in {
-          base = renameBin baseEnv "";
-          noproc = renameBin noProcEnv "-noproc";
-          ephemeral = ephemeralEnv;
-        };
+      in {
+        base = renameBin baseEnv "";
+        noproc = renameBin noProcEnv "-noproc";
+        ephemeral = ephemeralEnv;
+      };
     });
 
     packages = eachSystem (system: let
@@ -167,16 +172,39 @@
         type = "app";
         program = "${pkgsForSystem.default}/bin/timid-brave";
       };
-      timid-brave = { type = "app"; program = "${pkgsForSystem.timid-brave}/bin/timid-brave"; };
-      timid-brave-noproc = { type = "app"; program = "${pkgsForSystem.timid-brave-noproc}/bin/timid-brave-noproc"; };
-      timid-brave-ephemeral = { type = "app"; program = "${pkgsForSystem.timid-brave-ephemeral}/bin/timid-brave-ephemeral"; };
-      
-      timid-helium = { type = "app"; program = "${pkgsForSystem.timid-helium}/bin/timid-helium"; };
-      timid-helium-noproc = { type = "app"; program = "${pkgsForSystem.timid-helium-noproc}/bin/timid-helium-noproc"; };
-      timid-helium-ephemeral = { type = "app"; program = "${pkgsForSystem.timid-helium-ephemeral}/bin/timid-helium-ephemeral"; };
+      timid-brave = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave}/bin/timid-brave";
+      };
+      timid-brave-noproc = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave-noproc}/bin/timid-brave-noproc";
+      };
+      timid-brave-ephemeral = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave-ephemeral}/bin/timid-brave-ephemeral";
+      };
+
+      timid-helium = {
+        type = "app";
+        program = "${pkgsForSystem.timid-helium}/bin/timid-helium";
+      };
+      timid-helium-noproc = {
+        type = "app";
+        program = "${pkgsForSystem.timid-helium-noproc}/bin/timid-helium-noproc";
+      };
+      timid-helium-ephemeral = {
+        type = "app";
+        program = "${pkgsForSystem.timid-helium-ephemeral}/bin/timid-helium-ephemeral";
+      };
     });
 
-    nixosModules.default = { pkgs, config, lib, ... }@args:
-      import ./modules/default.nix (args // { inherit inputs; });
+    nixosModules.default = {
+      pkgs,
+      config,
+      lib,
+      ...
+    } @ args:
+      import ./modules/default.nix (args // {inherit inputs;});
   };
 }

@@ -4,16 +4,16 @@
   pkgs,
   inputs,
   ...
-}:
-let
+}: let
   inherit (lib) mkOption mkEnableOption mkPackageOption literalExpression;
   inherit (lib.types) listOf str attrs;
 
   cfg = config.programs.timid;
 
-  defaultPolicies = import ./policies.nix { inherit (inputs) debloat-profile; };
-in
-{
+  # Vendored copy of the debloat profile, regenerated from upstream's
+  # src/manifest.yaml by scripts/gen-debloat-policy.py.
+  defaultPolicies = import ./policies.nix {debloat-profile = ./brave.json;};
+in {
   options.programs.timid = {
     enable = mkEnableOption "Timid, a privacy-conscious sandboxed browser";
 
@@ -33,14 +33,14 @@ in
 
     policies = mkOption {
       type = attrs;
-      default = { };
+      default = {};
       description = "Additional managed policies to merge on top of defaults.";
     };
 
     extensions = mkOption {
       type = listOf str;
-      default = [ ];
-      example = [ "cjpalhdlnbpafiamejdnhcphjbkeiagm" ];
+      default = [];
+      example = ["cjpalhdlnbpafiamejdnhcphjbkeiagm"];
       description = "Chrome Web Store extension IDs to force-install.";
     };
   };
@@ -56,7 +56,7 @@ in
         policies =
           defaultPolicies
           // cfg.policies
-          // lib.optionalAttrs (cfg.extensions != [ ]) {
+          // lib.optionalAttrs (cfg.extensions != []) {
             ExtensionInstallForcelist = cfg.extensions;
           };
       }).config.env

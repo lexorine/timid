@@ -1,0 +1,101 @@
+name: autoupdate
+
+on:
+  schedule:
+    # 04:17 UTC daily. Off the hour on purpose: GitHub cron queues are heavily
+    # oversubscribed at :00, so a minute past it starts faster and reliably.
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autoupdate
+  cancel-in-progress: false
+
+jobs:
+  autoupdate:
+    name: Update browser and policy pins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install generator dependency
+        run: python -m pip install pyyaml
+
+      - name: Regenerate debloat policy from upstream manifest
+        run: python scripts/gen-debloat-policy.py --browser brave -o modules/brave.json
+
+      - name: Update flake inputs
+        run: nix flake update --show-trace
+
+      - name: Verify the flake evaluates
+        run: nix flake check --no-build --no-write-lock-file --show-trace
+
+      - name: Verify the packages build
+        run: |
+          nix build .#packages.x86_64-linux.default \
+            .#packages.x86_64-linux.timid-brave-ephemeral \
+            .#packages.x86_64-linux.timid-helium \
+            --no-link --no-write-lock-file
+
+      - name: Check formatting
+        run: nix fmt -- --check .
+
+      - name: Commit if anything changed
+        id: commit
+        run: |
+          if git diff --quiet; then
+            echo "No changes - upstream pins already current."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flake.lock modules/brave.json
+          git commit -m "autoupdate: refresh flake inputs and debloat policy"
+
+          # Never push straight to main: this repo is consumed as a flake, so a
+          # broken lock would break downstream rebuilds. Land it as a PR instead.
+          git push origin "HEAD:refs/heads/autoupdate"
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update pull request
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "autoupdate: refresh flake inputs and debloat policy"
+        run: |
+          BODY=$(cat <<'PRBODY'
+          Daily automated refresh of:
+
+          * flake inputs (`nix flake update`): nixpkgs, brave-nightly,
+            helium-browser, nixpak
+          * `modules/brave.json`, regenerated from upstream
+            `NVFP4/chrome-debloat` `src/manifest.yaml` by
+            `scripts/gen-debloat-policy.py`
+
+          Verified in CI before this PR is opened: `nix flake check`, a build
+          of the x86_64-linux default, ephemeral and helium packages, and
+          `nix fmt --check`.
+
+          Brave Nightly is a rolling release, so the bundled browser version
+          moves daily and this PR will normally contain a new browser build.
+          PRBODY
+          )
+          if gh pr view --head autoupdate >/dev/null 2>&1; then
+            gh pr edit autoupdate --title "$TITLE" --body "$BODY"
+            echo "Updated existing autoupdate PR."
+          else
+            gh pr create --head autoupdate --base main --title "$TITLE" --body "$BODY"
+            echo "Opened new autoupdate PR."
+          fi

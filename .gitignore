@@ -6,5 +6,7 @@
 !/flake.nix
 !/flake.lock 
 
+!/.github/
 !/modules/
 !/nix/
+!/scripts/
