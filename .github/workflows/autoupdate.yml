@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: autoupdate
@@ -45,17 +44,16 @@ jobs:
           nix build .#packages.x86_64-linux.default \
             .#packages.x86_64-linux.timid-brave-ephemeral \
             .#packages.x86_64-linux.timid-helium \
+            .#packages.x86_64-linux.timid-brave-origin-captive \
             --no-link --no-write-lock-file
 
       - name: Check formatting
         run: nix fmt -- --check .
 
-      - name: Commit if anything changed
-        id: commit
+      - name: Commit and push if anything changed
         run: |
           if git diff --quiet; then
             echo "No changes - upstream pins already current."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -64,40 +62,6 @@ jobs:
           git add flake.lock modules/brave.json
           git commit -m "autoupdate: refresh flake inputs and debloat policy"
 
-          # Never push straight to main: this repo is consumed as a flake, so a
-          # broken lock would break downstream rebuilds. Land it as a PR instead.
-          # The branch is bot-owned and rebuilt from main each run, so force.
-          git push --force origin "HEAD:refs/heads/autoupdate"
-
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-
-      - name: Open or update pull request
-        if: steps.commit.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TITLE: "autoupdate: refresh flake inputs and debloat policy"
-        run: |
-          BODY=$(cat <<'PRBODY'
-          Daily automated refresh of:
-
-          * flake inputs (`nix flake update`): nixpkgs, brave-nightly,
-            helium-browser, nixpak
-          * `modules/brave.json`, regenerated from upstream
-            `NVFP4/chrome-debloat` `src/manifest.yaml` by
-            `scripts/gen-debloat-policy.py`
-
-          Verified in CI before this PR is opened: `nix flake check`, a build
-          of the x86_64-linux default, ephemeral and helium packages, and
-          `nix fmt --check`.
-
-          Brave Nightly is a rolling release, so the bundled browser version
-          moves daily and this PR will normally contain a new browser build.
-          PRBODY
-          )
-          if gh pr view --head autoupdate >/dev/null 2>&1; then
-            gh pr edit autoupdate --title "$TITLE" --body "$BODY"
-            echo "Updated existing autoupdate PR."
-          else
-            gh pr create --head autoupdate --base main --title "$TITLE" --body "$BODY"
-            echo "Opened new autoupdate PR."
-          fi
+          # Every gate above (flake check, builds, fmt) already passed, so land
+          # the refresh directly on main.
+          git push origin HEAD:main

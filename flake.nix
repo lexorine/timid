@@ -179,6 +179,11 @@
         name = "timid-brave";
       };
 
+      originSuite = libForSystem.mkBrowserSuite {
+        browser = inputs.brave-previews.packages.${system}.brave-origin-nightly;
+        name = "timid-brave-origin";
+      };
+
       heliumSuite = libForSystem.mkBrowserSuite {
         browser = inputs.helium-browser.packages.${system}.default;
         name = "timid-helium";
@@ -189,6 +194,11 @@
       timid-brave-noproc = braveSuite.noproc;
       timid-brave-ephemeral = braveSuite.ephemeral;
       timid-brave-captive = braveSuite.captive;
+
+      timid-brave-origin = originSuite.base;
+      timid-brave-origin-noproc = originSuite.noproc;
+      timid-brave-origin-ephemeral = originSuite.ephemeral;
+      timid-brave-origin-captive = originSuite.captive;
 
       timid-helium = heliumSuite.base;
       timid-helium-noproc = heliumSuite.noproc;
@@ -228,6 +238,23 @@
       timid-helium-captive = {
         type = "app";
         program = "${pkgsForSystem.timid-helium-captive}/bin/timid-helium-captive";
+      };
+
+      timid-brave-origin = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave-origin}/bin/timid-brave-origin";
+      };
+      timid-brave-origin-noproc = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave-origin-noproc}/bin/timid-brave-origin-noproc";
+      };
+      timid-brave-origin-ephemeral = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave-origin-ephemeral}/bin/timid-brave-origin-ephemeral";
+      };
+      timid-brave-origin-captive = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave-origin-captive}/bin/timid-brave-origin-captive";
       };
 
       timid-helium = {
