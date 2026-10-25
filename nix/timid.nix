@@ -219,7 +219,7 @@ in
         bind.rw =
           [
             [
-              (sloth.mkdir (sloth.concat' home "/Downloads/bwrap"))
+              (sloth.mkdir (sloth.concat' home "/Downloads/nixpak"))
               (sloth.concat' home "/Downloads")
             ]
             (envSuffix "XDG_RUNTIME_DIR" "/at-spi/bus")
