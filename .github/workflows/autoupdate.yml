@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: autoupdate
@@ -65,7 +66,8 @@ jobs:
 
           # Never push straight to main: this repo is consumed as a flake, so a
           # broken lock would break downstream rebuilds. Land it as a PR instead.
-          git push origin "HEAD:refs/heads/autoupdate"
+          # The branch is bot-owned and rebuilt from main each run, so force.
+          git push --force origin "HEAD:refs/heads/autoupdate"
 
           echo "changed=true" >> "$GITHUB_OUTPUT"
 

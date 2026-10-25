@@ -10,6 +10,7 @@
   debug ? false,
   withProc ? true,
   ephemeral ? false,
+  captive ? false,
   chromeFlags ? ["--password-store=basic" "--enable-features=BraveAIChatAgentProfile"],
 }: let
   browserName = lib.getName browser;
@@ -256,7 +257,11 @@ in
             "/etc/ssl"
             "/etc/ca-certificates"
             "/run/current-system/sw/etc/ssl"
-            "/etc/resolv.conf"
+            (
+              if captive
+              then [(sloth.env "TIMID_RESOLV_CONF") "/etc/resolv.conf"]
+              else "/etc/resolv.conf"
+            )
             "/etc/zoneinfo"
             "/etc/localtime"
 

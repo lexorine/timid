@@ -90,6 +90,24 @@
           chromeFlags = ["--password-store=basic"];
         };
 
+        drvCaptive = mkTimid {
+          withProc = true;
+          ephemeral = true;
+          captive = true;
+          policies =
+            (basePolicies.managed or basePolicies)
+            // ephemeralPolicies
+            // {
+              DnsOverHttpsMode = "off";
+              BuiltInDnsClientEnabled = false;
+              HttpsOnlyMode = "disallowed";
+              HttpsUpgradesEnabled = false;
+            };
+          recommendedPolicies = basePolicies.recommended or {};
+          inherit policyDirs;
+          chromeFlags = ["--password-store=basic"];
+        };
+
         baseEnv = drv.config.env;
         noProcEnv = drvNoProc.config.env;
         ephemeralBaseEnv = drvEphemeral.config.env;
@@ -118,6 +136,16 @@
             "$@"
         '';
 
+        captiveLauncher = pkgs.writeShellApplication {
+          name = "${name}-captive";
+          runtimeInputs = [pkgs.iproute2 pkgs.gawk pkgs.gnused pkgs.gnugrep pkgs.coreutils];
+          text =
+            ''
+              BIN="${drvCaptive.config.env}/bin/${browserBin}"
+            ''
+            + builtins.readFile ./scripts/timid-captive.sh;
+        };
+
         ephemeralEnv = pkgs.symlinkJoin {
           name = "${name}-ephemeral";
           paths = [ephemeralBaseEnv ephemeralLauncher];
@@ -138,6 +166,7 @@
         base = renameBin baseEnv "";
         noproc = renameBin noProcEnv "-noproc";
         ephemeral = ephemeralEnv;
+        captive = captiveLauncher;
       };
     });
 
@@ -159,10 +188,13 @@
       timid-brave = braveSuite.base;
       timid-brave-noproc = braveSuite.noproc;
       timid-brave-ephemeral = braveSuite.ephemeral;
+      timid-brave-captive = braveSuite.captive;
 
       timid-helium = heliumSuite.base;
       timid-helium-noproc = heliumSuite.noproc;
       timid-helium-ephemeral = heliumSuite.ephemeral;
+      timid-helium-captive = heliumSuite.captive;
+      timid-captive = braveSuite.captive;
     });
 
     apps = eachSystem (system: let
@@ -183,6 +215,19 @@
       timid-brave-ephemeral = {
         type = "app";
         program = "${pkgsForSystem.timid-brave-ephemeral}/bin/timid-brave-ephemeral";
+      };
+
+      timid-captive = {
+        type = "app";
+        program = "${pkgsForSystem.timid-captive}/bin/timid-brave-captive";
+      };
+      timid-brave-captive = {
+        type = "app";
+        program = "${pkgsForSystem.timid-brave-captive}/bin/timid-brave-captive";
+      };
+      timid-helium-captive = {
+        type = "app";
+        program = "${pkgsForSystem.timid-helium-captive}/bin/timid-helium-captive";
       };
 
       timid-helium = {
