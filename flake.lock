@@ -8,11 +8,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794311732,
-        "narHash": "sha256-nSqru228pJDE1pdz7gQObitKKePEs90Pdb0XiYWJl90=",
+        "lastModified": 1794396714,
+        "narHash": "sha256-H22MgcbNXuCE8L8P/j8lYEZ4/PKPLa4vXhr8Xpx9f0o=",
         "owner": "kcalvelli",
         "repo": "brave-browser-previews",
-        "rev": "207804314a2aaff47a8ca3c4a5273517236d6829",
+        "rev": "fabc769c731a154a471eb35de7a7012f2357e116",
         "type": "github"
       },
       "original": {
@@ -67,11 +67,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793894983,
-        "narHash": "sha256-Edf2dXsfHch4YEjzSdBY5+CEmBTBWa5psnlDWExBKWk=",
+        "lastModified": 1794326795,
+        "narHash": "sha256-u/bFiTT2reDPGKDeOWEJMBd7iNYFkbdcIsrymwCF8OU=",
         "owner": "oxcl",
         "repo": "nix-flake-helium-browser",
-        "rev": "9fe3f8f48c8c25b0d245d13d6c91d4cf77adc729",
+        "rev": "ee8c73c6432d7337216775ccbe726c3004af6542",
         "type": "github"
       },
       "original": {
