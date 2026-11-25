@@ -8,11 +8,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795530233,
-        "narHash": "sha256-q5hlNn7Nn9RIDAY3f89Qze4vVsadVkwupajehMz9r+Y=",
+        "lastModified": 1795614100,
+        "narHash": "sha256-gvEmYxYjeHgtvKROuINrAcojKJf5uFphqK+0xV1EWX0=",
         "owner": "kcalvelli",
         "repo": "brave-browser-previews",
-        "rev": "ecb33232adeab2d9a2f7ae301b3a0ddabb178ed8",
+        "rev": "fd6de0de52434a00ba97c6427d086a16b1f43920",
         "type": "github"
       },
       "original": {
